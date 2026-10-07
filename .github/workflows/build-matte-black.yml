@@ -48,17 +48,7 @@ jobs:
           test -n "$APP"
           mkdir -p "$APP/Frameworks"
           cp .theos/obj/FilzaApplySandboxExt.dylib "$APP/Frameworks/FilzaApplySandboxExt.dylib"
-          python3 - "$APP/Info.plist" <<'PY'
-import plistlib
-import sys
-path = sys.argv[1]
-with open(path, 'rb') as f:
-    info = plistlib.load(f)
-info.pop('CFBundleURLTypes', None)
-info['FilzaSlopVersion'] = 'v1.2.0-matte-black'
-with open(path, 'wb') as f:
-    plistlib.dump(info, f, fmt=plistlib.FMT_BINARY)
-PY
+          python3 -c 'import plistlib,sys; p=sys.argv[1]; f=open(p,"rb"); info=plistlib.load(f); f.close(); info.pop("CFBundleURLTypes",None); info["FilzaSlopVersion"]="v1.2.0-matte-black"; f=open(p,"wb"); plistlib.dump(info,f,fmt=plistlib.FMT_BINARY); f.close()' "$APP/Info.plist"
           (cd ipa-stage && zip -qry ../FilzaSlop-v1.2.0-matte-black-unsigned.ipa Payload)
           shasum -a 256 FilzaSlop-v1.2.0-matte-black-unsigned.ipa
 
