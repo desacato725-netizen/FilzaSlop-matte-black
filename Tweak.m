@@ -16,6 +16,161 @@
 #include "PosterBoardFeature.h"
 #include "UpdateChecker.h"
 
+#pragma mark - FilzaSlop visual theme
+
+static const void *kFSBottomBarKey = &kFSBottomBarKey;
+
+static UIColor *FSMatteBlackColor(void) {
+    return [UIColor colorWithWhite:0.035 alpha:1.0];
+}
+
+static void FSApplyMatteBlackTheme(UIView *view) {
+    if (!view) return;
+    view.backgroundColor = FSMatteBlackColor();
+    if ([view isKindOfClass:UITableView.class]) {
+        UITableView *table = (UITableView *)view;
+        table.backgroundColor = FSMatteBlackColor();
+        table.separatorColor = [UIColor colorWithWhite:0.16 alpha:1.0];
+    }
+    if ([view isKindOfClass:UILabel.class])
+        ((UILabel *)view).textColor = [UIColor colorWithWhite:0.96 alpha:1.0];
+    if ([view isKindOfClass:UIButton.class]) {
+        UIButton *button = (UIButton *)view;
+        [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        button.tintColor = [UIColor whiteColor];
+    }
+    if ([view isKindOfClass:UIImageView.class]) {
+        UIImageView *imageView = (UIImageView *)view;
+        imageView.tintColor = [UIColor whiteColor];
+        if (imageView.image)
+            imageView.image = [imageView.image imageWithRenderingMode:
+                UIImageRenderingModeAlwaysTemplate];
+    }
+    if ([view isKindOfClass:UINavigationBar.class]) {
+        UINavigationBar *navigationBar = (UINavigationBar *)view;
+        navigationBar.barTintColor = FSMatteBlackColor();
+        navigationBar.tintColor = [UIColor whiteColor];
+        navigationBar.titleTextAttributes = @{NSForegroundColorAttributeName:
+            [UIColor whiteColor]};
+    }
+    if ([view isKindOfClass:UIToolbar.class]) {
+        UIToolbar *toolbar = (UIToolbar *)view;
+        toolbar.barTintColor = FSMatteBlackColor();
+        toolbar.tintColor = [UIColor whiteColor];
+    }
+    for (UIView *child in view.subviews)
+        FSApplyMatteBlackTheme(child);
+}
+
+static void FSReloadBrowser(UIViewController *controller) {
+    SEL selector = NSSelectorFromString(@"doLoadingPage");
+    if ([controller respondsToSelector:selector])
+        ((void(*)(id, SEL))objc_msgSend)(controller, selector);
+}
+
+static void FSShowThemeInfo(UIViewController *controller) {
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:@"Config"
+        message:@"Tema preto fosco ativo. Ícones e textos foram ajustados para branco."
+        preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"OK"
+        style:UIAlertActionStyleDefault handler:nil]];
+    [controller presentViewController:alert animated:YES completion:nil];
+}
+
+static void FSBottomBarAction(id self, SEL _cmd, UIButton *button) {
+    UIViewController *controller = (UIViewController *)self;
+    switch (button.tag) {
+        case 0: {
+            UIAlertController *menu = [UIAlertController
+                alertControllerWithTitle:@"Funções"
+                message:@"Ações rápidas do navegador de arquivos"
+                preferredStyle:UIAlertControllerStyleActionSheet];
+            [menu addAction:[UIAlertAction actionWithTitle:@"Atualizar lista"
+                style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a) {
+                    FSReloadBrowser(controller);
+                }]];
+            [menu addAction:[UIAlertAction actionWithTitle:@"Cancelar"
+                style:UIAlertActionStyleCancel handler:nil]];
+            [controller presentViewController:menu animated:YES completion:nil];
+            break;
+        }
+        case 1:
+            FSReloadBrowser(controller);
+            break;
+        case 2:
+            FSShowThemeInfo(controller);
+            break;
+    }
+}
+
+static void FSInstallBottomBar(UIViewController *controller) {
+    if (!controller || !controller.isViewLoaded) return;
+    FSApplyMatteBlackTheme(controller.view);
+    UIView *bar = objc_getAssociatedObject(controller, kFSBottomBarKey);
+    if (!bar) {
+        CGFloat barHeight = 78.0;
+        bar = [[UIView alloc] initWithFrame:CGRectMake(12, 0,
+            controller.view.bounds.size.width - 24, barHeight)];
+        bar.backgroundColor = [UIColor colorWithWhite:0.055 alpha:0.98];
+        bar.layer.cornerRadius = 28.0;
+        bar.layer.borderWidth = 1.0;
+        bar.layer.borderColor = [UIColor colorWithWhite:0.16 alpha:1.0].CGColor;
+        bar.layer.masksToBounds = YES;
+        bar.autoresizingMask = UIViewAutoresizingFlexibleWidth |
+            UIViewAutoresizingFlexibleTopMargin;
+        class_addMethod(controller.class, @selector(fs_bottomBarAction:),
+            (IMP)FSBottomBarAction, "v@:@");
+        NSArray<NSString *> *titles = @[@"Funções", @"Partidas", @"Config"];
+        NSArray<NSString *> *symbols = @[
+            @"square.grid.2x2.fill", @"gamecontroller.fill", @"gearshape.fill"];
+        for (NSUInteger index = 0; index < titles.count; index++) {
+            UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+            button.tag = (NSInteger)index;
+            button.tintColor = [UIColor whiteColor];
+            [button setTitle:titles[index] forState:UIControlStateNormal];
+            [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            button.titleLabel.font = [UIFont systemFontOfSize:13.0
+                weight:UIFontWeightSemibold];
+            if (@available(iOS 13.0, *)) {
+                [button setImage:[UIImage systemImageNamed:symbols[index]]
+                    forState:UIControlStateNormal];
+                button.imageView.tintColor = [UIColor whiteColor];
+                button.imageEdgeInsets = UIEdgeInsetsMake(-18, 0, 0, 0);
+                button.titleEdgeInsets = UIEdgeInsetsMake(28, -20, 0, 0);
+            }
+            [button addTarget:controller action:@selector(fs_bottomBarAction:)
+                forControlEvents:UIControlEventTouchUpInside];
+            [bar addSubview:button];
+        }
+        objc_setAssociatedObject(controller, kFSBottomBarKey, bar,
+            OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [controller.view addSubview:bar];
+    }
+    CGFloat bottomInset = MAX(controller.view.safeAreaInsets.bottom, 8.0);
+    CGFloat height = 78.0 + bottomInset;
+    bar.frame = CGRectMake(12, controller.view.bounds.size.height - height - 8,
+        controller.view.bounds.size.width - 24, height);
+    CGFloat width = bar.bounds.size.width / 3.0;
+    for (UIView *subview in bar.subviews) {
+        if ([subview isKindOfClass:UIButton.class]) {
+            UIButton *button = (UIButton *)subview;
+            button.frame = CGRectMake(width * button.tag, 0, width, 78.0);
+        }
+    }
+    [controller.view bringSubviewToFront:bar];
+    for (UIView *subview in controller.view.subviews) {
+        if ([subview isKindOfClass:UITableView.class]) {
+            UITableView *table = (UITableView *)subview;
+            UIEdgeInsets insets = table.contentInset;
+            insets.bottom = MAX(insets.bottom, height + 12.0);
+            table.contentInset = insets;
+            table.scrollIndicatorInsets = insets;
+        }
+    }
+}
+
+
 #pragma mark - Root Helper Hooks
 
 static BOOL hook_isRootHelperAvailable(id self, SEL _cmd) {
@@ -56,6 +211,7 @@ static void refreshWallpaperButton(id controller, id fallbackPath) {
         ? ((id(*)(id, SEL))objc_msgSend)(controller, selector) : nil;
     PBWallpaperConfigureBrowser((UIViewController *)controller,
         currentPath ?: fallbackPath);
+    FSInstallBottomBar((UIViewController *)controller);
 }
 
 static void hook_fileSystemUpdateEditableUI(id self, SEL _cmd) {
@@ -120,6 +276,7 @@ static void hook_fileSystemViewWillAppear(id self, SEL _cmd, BOOL animated) {
     NSString *visiblePath = [self respondsToSelector:visiblePathSelector]
         ? ((id(*)(id, SEL))objc_msgSend)(self, visiblePathSelector) : redirected;
     PBWallpaperConfigureBrowser(self, visiblePath);
+    FSInstallBottomBar((UIViewController *)self);
 
     // State restoration can leave the browser's table model empty even after
     // its path is correct. Reload on the next main-loop turn, after the view
@@ -136,6 +293,7 @@ static void hook_fileSystemViewWillAppear(id self, SEL _cmd, BOOL animated) {
             ((void(*)(id, SEL))objc_msgSend)(self, loadSelector);
             NSLog(@"[DeviceStorage] reloaded visible browser path %@", visiblePath);
         }
+        FSInstallBottomBar((UIViewController *)self);
     });
 }
 

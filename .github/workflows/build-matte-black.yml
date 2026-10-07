@@ -1,0 +1,72 @@
+name: Build FilzaSlop Matte Black
+
+on:
+  push:
+    branches:
+      - feat/matte-black-ui
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Theos
+        uses: beerpiss/theos-action@v1
+        with:
+          theos-dir: ${{ runner.temp }}/theos
+          theos-src: https://github.com/theos/theos
+          theos-sdks: https://github.com/theos/sdks
+          theos-sdks-ref: master
+
+      - name: Build tweak package
+        shell: bash
+        run: |
+          make clean
+          make package FINALPACKAGE=1
+          test -f .theos/obj/FilzaApplySandboxExt.dylib
+
+      - name: Download unsigned v1.2.0 base IPA
+        shell: bash
+        run: |
+          curl -fL --retry 3 \
+            -o FilzaSlop-v1.2.0-unsigned-base.ipa \
+            https://github.com/0xjohnnydev/FilzaSlop/releases/download/v1.2.0/FilzaSlop-v1.2.0-unsigned.ipa
+
+      - name: Assemble matte-black unsigned IPA
+        shell: bash
+        run: |
+          rm -rf ipa-stage FilzaSlop-v1.2.0-matte-black-unsigned.ipa
+          mkdir -p ipa-stage
+          unzip -q FilzaSlop-v1.2.0-unsigned-base.ipa -d ipa-stage
+          APP=$(find ipa-stage/Payload -maxdepth 1 -type d -name '*.app' -print -quit)
+          test -n "$APP"
+          mkdir -p "$APP/Frameworks"
+          cp .theos/obj/FilzaApplySandboxExt.dylib "$APP/Frameworks/FilzaApplySandboxExt.dylib"
+          python3 - "$APP/Info.plist" <<'PY'
+import plistlib
+import sys
+path = sys.argv[1]
+with open(path, 'rb') as f:
+    info = plistlib.load(f)
+info.pop('CFBundleURLTypes', None)
+info['FilzaSlopVersion'] = 'v1.2.0-matte-black'
+with open(path, 'wb') as f:
+    plistlib.dump(info, f, fmt=plistlib.FMT_BINARY)
+PY
+          (cd ipa-stage && zip -qry ../FilzaSlop-v1.2.0-matte-black-unsigned.ipa Payload)
+          shasum -a 256 FilzaSlop-v1.2.0-matte-black-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FilzaSlop-v1.2.0-matte-black
+          path: |
+            FilzaSlop-v1.2.0-matte-black-unsigned.ipa
+            packages/*.deb
+          if-no-files-found: error
