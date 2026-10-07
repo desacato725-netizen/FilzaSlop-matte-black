@@ -25,6 +25,39 @@ static UIColor *FSMatteBlackColor(void) {
     return [UIColor colorWithWhite:0.035 alpha:1.0];
 }
 
+static BOOL FSIsApplicationIcon(UIImageView *imageView) {
+    UIView *current = imageView;
+    while (current) {
+        NSString *className = NSStringFromClass(current.class);
+        if ([className rangeOfString:@"Application" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+            [className rangeOfString:@"AppItem" options:NSCaseInsensitiveSearch].location != NSNotFound)
+            return YES;
+        current = current.superview;
+    }
+    return NO;
+}
+
+static NSString *FSDisplayNameForPathLabel(NSString *text) {
+    static NSDictionary<NSString *, NSString *> *names;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        names = @{
+            @"[MHA-C2] App Data": @"App Data",
+            @"[MHA-C7] App Groups": @"App Groups",
+            @"[MHA-C4] Extension Data": @"Extension Data",
+            @"[MHA-C6] VPN Data": @"VPN Data",
+            @"[MHA-C10] Service Data": @"Service Data",
+            @"[MHA-C12] System Data": @"System Data",
+            @"[MHA-C13] System Groups": @"System Groups",
+            @"[MHA-C15] Protected Data": @"Protected Data",
+            @"[MHA-C13 Scoped] Additional Locations": @"Additional Locations",
+            @"[MHA-Mixed EXP] Experimental": @"Experimental",
+            @"[MHA-C2] Wallpaper Lab": @"Wallpaper Lab"
+        };
+    });
+    return names[text] ?: text;
+}
+
 static void FSApplyMatteBlackTheme(UIView *view) {
     if (!view) return;
     view.backgroundColor = FSMatteBlackColor();
@@ -33,8 +66,11 @@ static void FSApplyMatteBlackTheme(UIView *view) {
         table.backgroundColor = FSMatteBlackColor();
         table.separatorColor = [UIColor colorWithWhite:0.16 alpha:1.0];
     }
-    if ([view isKindOfClass:UILabel.class])
-        ((UILabel *)view).textColor = [UIColor colorWithWhite:0.96 alpha:1.0];
+    if ([view isKindOfClass:UILabel.class]) {
+        UILabel *label = (UILabel *)view;
+        label.text = FSDisplayNameForPathLabel(label.text);
+        label.textColor = [UIColor colorWithWhite:0.96 alpha:1.0];
+    }
     if ([view isKindOfClass:UIButton.class]) {
         UIButton *button = (UIButton *)view;
         [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
@@ -42,10 +78,12 @@ static void FSApplyMatteBlackTheme(UIView *view) {
     }
     if ([view isKindOfClass:UIImageView.class]) {
         UIImageView *imageView = (UIImageView *)view;
-        imageView.tintColor = [UIColor whiteColor];
-        if (imageView.image)
-            imageView.image = [imageView.image imageWithRenderingMode:
-                UIImageRenderingModeAlwaysTemplate];
+        if (!FSIsApplicationIcon(imageView)) {
+            imageView.tintColor = [UIColor whiteColor];
+            if (imageView.image)
+                imageView.image = [imageView.image imageWithRenderingMode:
+                    UIImageRenderingModeAlwaysTemplate];
+        }
     }
     if ([view isKindOfClass:UINavigationBar.class]) {
         UINavigationBar *navigationBar = (UINavigationBar *)view;
@@ -58,6 +96,23 @@ static void FSApplyMatteBlackTheme(UIView *view) {
         UIToolbar *toolbar = (UIToolbar *)view;
         toolbar.barTintColor = FSMatteBlackColor();
         toolbar.tintColor = [UIColor whiteColor];
+    }
+    if ([view isKindOfClass:UITabBar.class]) {
+        UITabBar *tabBar = (UITabBar *)view;
+        tabBar.barTintColor = FSMatteBlackColor();
+        tabBar.backgroundColor = FSMatteBlackColor();
+        tabBar.tintColor = [UIColor whiteColor];
+        tabBar.unselectedItemTintColor = [UIColor colorWithWhite:0.82 alpha:1.0];
+        for (UITabBarItem *item in tabBar.items) {
+            [item setTitleTextAttributes:@{NSForegroundColorAttributeName:
+                [UIColor whiteColor]} forState:UIControlStateNormal];
+            if (item.image)
+                item.image = [item.image imageWithRenderingMode:
+                    UIImageRenderingModeAlwaysTemplate];
+            if (item.selectedImage)
+                item.selectedImage = [item.selectedImage imageWithRenderingMode:
+                    UIImageRenderingModeAlwaysTemplate];
+        }
     }
     for (UIView *child in view.subviews)
         FSApplyMatteBlackTheme(child);
@@ -122,9 +177,9 @@ static void FSInstallBottomBar(UIViewController *controller) {
             UIViewAutoresizingFlexibleTopMargin;
         class_addMethod(controller.class, @selector(fs_bottomBarAction:),
             (IMP)FSBottomBarAction, "v@:@");
-        NSArray<NSString *> *titles = @[@"Funções", @"Partidas", @"Config"];
+        NSArray<NSString *> *titles = @[@"Funções", @"Arquivos", @"Config"];
         NSArray<NSString *> *symbols = @[
-            @"square.grid.2x2.fill", @"gamecontroller.fill", @"gearshape.fill"];
+            @"square.grid.2x2.fill", @"folder.fill", @"gearshape.fill"];
         for (NSUInteger index = 0; index < titles.count; index++) {
             UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
             button.tag = (NSInteger)index;
