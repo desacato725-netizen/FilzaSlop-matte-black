@@ -23,6 +23,7 @@ jobs:
           theos-src: https://github.com/theos/theos
           theos-sdks: https://github.com/theos/sdks
           theos-sdks-ref: master
+          cache: false
 
       - name: Build tweak package
         shell: bash
