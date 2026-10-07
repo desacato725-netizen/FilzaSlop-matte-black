@@ -18,6 +18,7 @@
 
 #pragma mark - FilzaSlop visual theme
 
+static UIViewController *activeBrowserController(void);
 static const void *kFSBottomBarKey = &kFSBottomBarKey;
 
 static UIColor *FSMatteBlackColor(void) {
@@ -1763,4 +1764,13 @@ __attribute__((constructor)) void TweakInit(void) {
     runMCMPath();
     scheduleInitialBrowserRepair(8);
     FSUpdateCheckerStart();
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
+        object:nil queue:[NSOperationQueue mainQueue]
+        usingBlock:^(__unused NSNotification *notification) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 350 * NSEC_PER_MSEC),
+                dispatch_get_main_queue(), ^{
+                    UIViewController *controller = activeBrowserController();
+                    if (controller) FSInstallBottomBar(controller);
+                });
+        }];
 }
